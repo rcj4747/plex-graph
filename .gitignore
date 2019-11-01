@@ -1,2 +1,3 @@
 .mypy_cache/
 plex_graph.egg-info/
+**/config.ini
