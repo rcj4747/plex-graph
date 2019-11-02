@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 '''
+Playing around with pulling movie data from plex servers and graphing
+relationships between movies via actors.
 '''
 import ast
 import shelve
@@ -21,6 +23,7 @@ CONFIG_FILE: str = 'config.ini'
 
 @dataclass(eq=True, frozen=True)
 class Movie:
+    '''Plex Movie data class comprised of nearly all data plex stores'''
     name: str
     year: int
     studio: str
@@ -44,11 +47,13 @@ MOVIES: List[Movie] = []
 
 
 def write_config(config: ConfigParser) -> None:
+    '''Store plex server authentication on disk'''
     with open(CONFIG_FILE, 'w') as config_file:
         config.write(config_file)
 
 
 def generate_config(user: str, password: str) -> None:
+    '''Build the ConfigParser data for plex server authentication'''
     config: ConfigParser = ConfigParser()
     account = MyPlexAccount(PLEX_USER, PLEX_PASS)
 
@@ -63,6 +68,7 @@ def generate_config(user: str, password: str) -> None:
 
 
 def read_config():
+    '''Read plex server authentication from disk. Returns ConfigParser obj'''
     with open(CONFIG_FILE, 'r') as config_file:
         config = ConfigParser()
         config.read_file(config_file)
@@ -70,6 +76,7 @@ def read_config():
 
 
 def get_servers(config):
+    '''Connect to plex servers from our config and return the server objs'''
     servers = []
     for key in list(config.keys()):
         if key.startswith('server:'):
@@ -123,6 +130,15 @@ def get_servers(config):
 
 
 def update_config(config, servers):
+    '''
+    After connecting to servers, update ConfigParser data with lasturl data.
+
+    The plex API may return multiple URIs for each server.  To speed future
+    connections we will save the URI that worked so we can try that first.
+
+    Returns the updated ConfigParser.
+    '''
+
     for server in servers:
         if 'lasturl' in server:
             config[f'server:{server["name"]}']['lasturl'] = server['lasturl']
@@ -131,6 +147,11 @@ def update_config(config, servers):
 
 
 def get_plex_movie_sections(server):
+    '''
+    Finds all 'Movie' library sections on a server.
+
+    Returns a list of plexapi.library.MovieSection objects
+    '''
     movie_sections = [section for section in
                       server['connection'].library.sections()
                       if section.title == 'Movies']
@@ -138,10 +159,14 @@ def get_plex_movie_sections(server):
     return movie_sections
 
 
-def get_plex_movies(movie_sections):
-    global MOVIES
-    global GENRES
-    global PEOPLE
+def parse_plex_movies(movie_sections):
+    '''Parse all movies in the list of movie library sections.
+
+    Populate the global list of movies, genres, and people from Plex
+    '''
+    global MOVIES  # noqa: W0603
+    global GENRES  # noqa: W0603
+    global PEOPLE  # noqa: W0603
 
     movie_count = 1
     for section in movie_sections:
@@ -183,6 +208,11 @@ def get_plex_movies(movie_sections):
 
 
 def write_shelve():
+    '''Store the global list of Movies, Genres, and People on disk
+
+    To avoid pulling data from the plex server on each run we write
+    a python shelve file.
+    '''
     # Opening with mode 'n' will always create a new, empty database
     with shelve.open('shelve', 'n') as data:
         data['MOVIES'] = MOVIES
@@ -191,9 +221,14 @@ def write_shelve():
 
 
 def read_shelve():
-    global MOVIES
-    global GENRES
-    global PEOPLE
+    '''Read the global list of Movies, Genres, and People from disk
+
+    To avoid pulling data from the plex server on each run we use
+    a python shelve file to persist data between runs.
+    '''
+    global MOVIES  # noqa: W0603
+    global GENRES  # noqa: W0603
+    global PEOPLE  # noqa: W0603
 
     with shelve.open('shelve', 'r') as data:
         MOVIES = data['MOVIES']
@@ -202,6 +237,9 @@ def read_shelve():
 
 
 def generate_data():
+    '''Glue code incorporating all the functions to read data from plex
+    and generate our data for future runs.
+    '''
     if PLEX_USER and PLEX_PASS:
         generate_config(PLEX_USER, PLEX_PASS)
     config = read_config()
@@ -210,27 +248,28 @@ def generate_data():
     for server in servers:
         print(f'Indexing server {server["name"]}')
         movie_sections = get_plex_movie_sections(server)
-        get_plex_movies(movie_sections)
+        parse_plex_movies(movie_sections)
     write_shelve()
 
 
 def graph_data():
+    '''Experiment with graphing Movie and Actor relationships'''
     print('Loading data from disk...', end='')
     read_shelve()
     print('done')
 
-    # Drop people that are connected to less than 2 movies
-    # And right now that will be actors
+    # Count the number of movies an actor appears in
     actors = {person: 0 for person in PEOPLE}
     for movie in MOVIES:
         for actor in movie.actors:
             actors[actor] = actors[actor] + 1
 
+    # Drop people that are connected to less than {MIN_RELATIONS} movies
+    # And right now that will be actors
     drops = set()
     for person in PEOPLE:
         if actors[person] < MIN_RELATIONS:
             drops.add(person)
-
     print(f'There are {len(PEOPLE)} actors total')
     people = PEOPLE - drops
     print(f'Dropping actors with less than {MIN_RELATIONS} movies leaves '
