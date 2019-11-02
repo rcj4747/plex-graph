@@ -2,6 +2,7 @@
 plex_graph.egg-info/
 **/config.ini
 **/.*.swp
+**/shelve
 
 
 ## From https://github.com/github/gitignore/blob/master/Python.gitignore
