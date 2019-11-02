@@ -1,3 +1,4 @@
 matplotlib
 networkx
 plexapi
+pre-commit
