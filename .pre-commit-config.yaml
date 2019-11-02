@@ -25,13 +25,7 @@ repos:
     rev: v0.740
     hooks:
     -   id: mypy
-#        args: [--strict, --ignore-missing-imports]
-        args: [--disallow-untyped-defs,
-               --ignore-missing-imports,
-               --disallow-incomplete-defs,
-               --disallow-untyped-decorators,
-               --disallow-untyped-calls,
-               --no-implicit-optional]
+        args: [--strict, --ignore-missing-imports]
 -   repo: https://github.com/pre-commit/mirrors-autopep8
     rev: v1.4.4
     hooks:

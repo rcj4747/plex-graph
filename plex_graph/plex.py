@@ -40,10 +40,10 @@ class Movie:
     studio: str
     content_rating: str
     rating: str
-    writers: Tuple = field(default_factory=tuple)
-    directors: Tuple = field(default_factory=tuple)
-    actors: Tuple = field(default_factory=tuple)
-    genres: Tuple = field(default_factory=tuple)
+    writers: Tuple[str, ...] = field(default_factory=tuple)
+    directors: Tuple[str, ...] = field(default_factory=tuple)
+    actors: Tuple[str, ...] = field(default_factory=tuple)
+    genres: Tuple[str, ...] = field(default_factory=tuple)
 
     def __str__(self) -> str:
         return f'{self.name}'

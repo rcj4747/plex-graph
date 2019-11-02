@@ -7,10 +7,19 @@ plex_graph/plex.py - All the logic is dumped in this file current
 - Uncomment generate_data() at the bottom of the file to collect new data
    from your plex server(s)
 - Data is saved in a shelve so graphing can be tweaked without repeatedly
-   indexing from the plex server(s); currently by commenting out generate_data().
+   indexing from the plex server(s); currently by commenting out
+   generate_data().
 
 $PWD/config.ini
-- On first run this file will be written with credential for each plex server.
+- On first run this file will be written with credential for each
+  plex server.
 
 $PWD/shelve
 - This file is created to cache plex movie data
+
+TODO
+- Consider moving to another visualization library like
+https://pypi.org/project/nxviz/.  nxviz provides node coloring, etc.
+Or https://github.com/WestHealth/pyvis which is interactive.
+- Add an actual CLI with click
+- A GUI?
