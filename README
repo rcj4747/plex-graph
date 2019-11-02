@@ -9,8 +9,8 @@ plex_graph/plex.py - All the logic is dumped in this file current
 - Data is saved in a shelve so graphing can be tweaked without repeatedly
    indexing from the plex server(s); currently by commenting out generate_data().
 
-./config.ini
+$PWD/config.ini
 - On first run this file will be written with credential for each plex server.
 
-./shelve
+$PWD/shelve
 - This file is created to cache plex movie data
