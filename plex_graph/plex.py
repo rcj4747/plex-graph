@@ -221,8 +221,6 @@ def graph_data():
     actors = {person: 0 for person in PEOPLE}
     for movie in MOVIES:
         for actor in movie.actors:
-            if actor == "Frank Morgan":
-                print(f'Frank Morgan in {movie.name}')
             actors[actor] = actors[actor] + 1
 
     drops = set()
