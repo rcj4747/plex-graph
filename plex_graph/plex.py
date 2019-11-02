@@ -34,6 +34,9 @@ class Movie:
     def __str__(self):
         return f'{self.name}'
 
+    def __repr__(self):
+        return f'{self.name}'
+
 
 GENRES: Set[str] = set()
 PEOPLE: Set[str] = set()
@@ -228,11 +231,12 @@ def graph_data():
         if actors[person] < MIN_RELATIONS:
             drops.add(person)
 
-    print(f'There are {len(PEOPLE)} actors and we will drop {len(drops)}')
+    print(f'There are {len(PEOPLE)} actors total')
     people = PEOPLE - drops
-    print(f'Now there are only {len(people)} actors')
+    print(f'Dropping actors with less than {MIN_RELATIONS} movies leaves '
+          f'{len(people)} actors')
 
-    graph = nx.Graph()
+    graph = nx.Graph(name='Movie/Actor relationships')
     for person in people:
         graph.add_node(person)
 
@@ -249,6 +253,7 @@ def graph_data():
                 graph.add_edge(movie, actor)
     print(f'Now there are only {movie_count} movies')
 
+    print(nx.classes.function.info(graph))
     nx.draw(graph, node_color='r', edge_color='b', with_labels=True)
     plot.show()
 
