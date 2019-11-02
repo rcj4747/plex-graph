@@ -63,7 +63,7 @@ def generate_config(user: str, password: str) -> None:
         config[f'server:{server.name}'] = {
             'baseurls': str([conn.httpuri for conn in server.connections]),
             'token': server.accessToken,
-            }
+        }
     write_config(config)
 
 
