@@ -2,19 +2,42 @@
 '''
 '''
 import ast
-# import pdb
+import shelve
 from configparser import ConfigParser
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Set, Tuple
 
+import matplotlib.pyplot as plot
+import networkx as nx
 import requests
-
 from plexapi.myplex import MyPlexAccount
 from plexapi.server import PlexServer
 
+MIN_RELATIONS: int = 11
 PLEX_USER: str = ''
 PLEX_PASS: str = ''
 CONFIG_FILE: str = 'config.ini'
+
+
+@dataclass(eq=True, frozen=True)
+class Movie:
+    name: str
+    year: int
+    studio: str
+    content_rating: str
+    rating: str
+    writers: Tuple[str] = field(default_factory=tuple)
+    directors: Tuple[str] = field(default_factory=tuple)
+    actors: Tuple[str] = field(default_factory=tuple)
+    genres: Tuple[str] = field(default_factory=tuple)
+
+    def __str__(self):
+        return f'{self.name}'
+
+
+GENRES: Set[str] = set()
+PEOPLE: Set[str] = set()
+MOVIES: List[Movie] = []
 
 
 def write_config(config: ConfigParser) -> None:
@@ -26,7 +49,6 @@ def generate_config(user: str, password: str) -> None:
     config: ConfigParser = ConfigParser()
     config['auth'] = {'user': user, 'pass': password}
     account = MyPlexAccount(PLEX_USER, PLEX_PASS)
-    # or server = account.resource('<SERVERNAME>').connect()
 
     servers = [resource for resource in account.resources()
                if 'server' in resource.provides.split(',')]
@@ -106,33 +128,78 @@ def update_config(config, servers):
     return config
 
 
-@dataclass
-class Genre:
-    name: str
-    id: int
+def get_plex_movie_sections(server):
+    movie_sections = [section for section in
+                      server['connection'].library.sections()
+                      if section.title == 'Movies']
+    print(f'Found movie section(s) {movie_sections}')
+    return movie_sections
 
 
-@dataclass
-class Person:
-    name: str
-    id: str
-    role: str
+def get_plex_movies(movie_sections):
+    global MOVIES
+    global GENRES
+    global PEOPLE
+
+    movie_count = 1
+    for section in movie_sections:
+        movie_total = len(section.all())
+        for media in section.all():
+            print(f'Processing({movie_count}/{movie_total}) "{media.title}"')
+            movie_count += 1
+            media.reload()  # Get full object metadata
+            writers: List[str] = set()
+            for person in media.writers:
+                person = person.tag
+                PEOPLE.add(person)
+                writers.add(person)
+            directors: List[str] = set()
+            for person in media.directors:
+                person = person.tag
+                PEOPLE.add(person)
+                directors.add(person)
+            actors: List[str] = set()
+            for person in media.roles:
+                person = person.tag
+                PEOPLE.add(person)
+                actors.add(person)
+            genres: List[str] = set()
+            for genre in media.genres:
+                genre = genre.tag
+                GENRES.add(genre)
+                genres.add(genre)
+            MOVIES.append(Movie(name=media.title,
+                                year=int(media.year or 1900),
+                                studio=media.studio,
+                                content_rating=media.contentRating,
+                                rating=media.rating,
+                                writers=tuple(writers),
+                                directors=tuple(directors),
+                                actors=tuple(actors),
+                                genres=tuple(genres),
+                                ))
 
 
-@dataclass
-class Movie:
-    name: str
-    year: int
-    studio: str
-    contentRating: str
-    rating: str
-    writers: List[Person] = field(default_factory=list)
-    directors: List[Person] = field(default_factory=list)
-    actors: List[Person] = field(default_factory=list)
-    genres: List[Genre] = field(default_factory=list)
+def write_shelve():
+    # Opening with mode 'n' will always create a new, empty database
+    with shelve.open('shelve', 'n') as data:
+        data['MOVIES'] = MOVIES
+        data['GENRES'] = GENRES
+        data['PEOPLE'] = PEOPLE
 
 
-def main():
+def read_shelve():
+    global MOVIES
+    global GENRES
+    global PEOPLE
+
+    with shelve.open('shelve', 'r') as data:
+        MOVIES = data['MOVIES']
+        GENRES = data['GENRES']
+        PEOPLE = data['PEOPLE']
+
+
+def generate_data():
     if PLEX_USER and PLEX_PASS:
         generate_config(PLEX_USER, PLEX_PASS)
     config = read_config()
@@ -140,41 +207,55 @@ def main():
     config = update_config(config, servers)
     for server in servers:
         print(f'Indexing server {server["name"]}')
-        movie_sections = [section for section in
-                          server['connection'].library.sections()
-                          if section.title == 'Movies']
-        print(f'Found movie section(s) {movie_sections}')
-        for section in movie_sections:
-            for media in section.all():
-                # Any of these lists could be empty
-                media.reload()  # Get full object metadata
-                print(media.title)
-                print(media.year)
-                print(media.studio)
-                print(media.rating)
-                print(media.contentRating)
-                if media.writers:
-                    print(f' w: #{len(media.writers)}')
-                    print(f' w: {media.writers[0].tag}')  # Writer name
-                    print(f' w: {media.writers[0].TAG}')  # 'Writer'
-                    print(f' w: {media.writers[0].id}')  # ID or None
-                if media.directors:
-                    print(f' d: #{len(media.directors)}')
-                    print(f' d: {media.directors[0].tag}')  # Director name
-                    print(f' d: {media.directors[0].TAG}')  # 'Director'
-                    print(f' d: {media.directors[0].id}')  # ID or None
-                if media.actors:
-                    print(f' a: #{len(media.actors)}')
-                    print(f' a: {media.actors[0].tag}')  # Actor name
-                    print(f' a: {media.actors[0].TAG}')  # 'Role'
-                    print(f' a: {media.actors[0].id}')  # ID or None
-                if media.genres:
-                    print(f' g: #{len(media.genres)}')
-                    print(f' g: {media.genres[0].tag}')  # Genre name
-                    print(f' g: {media.genres[0].TAG}')  # 'Genre'
-                    print(f' g: {media.genres[0].id}')  # ID or None
-#    pdb.set_trace()
+        movie_sections = get_plex_movie_sections(server)
+        get_plex_movies(movie_sections)
+    write_shelve()
+
+
+def graph_data():
+    print('Loading data from disk...', end='')
+    read_shelve()
+    print('done')
+
+    # Drop people that are connected to less than 2 movies
+    # And right now that will be actors
+    actors = {person: 0 for person in PEOPLE}
+    for movie in MOVIES:
+        for actor in movie.actors:
+            if actor == "Frank Morgan":
+                print(f'Frank Morgan in {movie.name}')
+            actors[actor] = actors[actor] + 1
+
+    drops = set()
+    for person in PEOPLE:
+        if actors[person] < MIN_RELATIONS:
+            drops.add(person)
+
+    print(f'There are {len(PEOPLE)} actors and we will drop {len(drops)}')
+    people = PEOPLE - drops
+    print(f'Now there are only {len(people)} actors')
+
+    graph = nx.Graph()
+    for person in people:
+        graph.add_node(person)
+
+    movie_count = 0
+    for movie in MOVIES:
+        relation_found = False
+        for actor in movie.actors:
+            if actor in people:
+                if not relation_found:
+                    # Only add a movie if we'll have an actor associated
+                    movie_count += 1
+                    graph.add_node(movie)
+                    relation_found = True
+                graph.add_edge(movie, actor)
+    print(f'Now there are only {movie_count} movies')
+
+    nx.draw(graph, node_color='r', edge_color='b', with_labels=True)
+    plot.show()
 
 
 if __name__ == '__main__':
-    main()
+    # generate_data()
+    graph_data()
