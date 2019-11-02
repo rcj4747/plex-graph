@@ -47,7 +47,6 @@ def write_config(config: ConfigParser) -> None:
 
 def generate_config(user: str, password: str) -> None:
     config: ConfigParser = ConfigParser()
-    config['auth'] = {'user': user, 'pass': password}
     account = MyPlexAccount(PLEX_USER, PLEX_PASS)
 
     servers = [resource for resource in account.resources()
