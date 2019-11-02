@@ -55,7 +55,7 @@ def write_config(config: ConfigParser) -> None:
 def generate_config(user: str, password: str) -> None:
     '''Build the ConfigParser data for plex server authentication'''
     config: ConfigParser = ConfigParser()
-    account = MyPlexAccount(PLEX_USER, PLEX_PASS)
+    account = MyPlexAccount(user, password)
 
     servers = [resource for resource in account.resources()
                if 'server' in resource.provides.split(',')]
