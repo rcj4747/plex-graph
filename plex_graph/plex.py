@@ -52,9 +52,12 @@ class Movie:
         return f'{self.name}'
 
 
-GENRES: Set[str] = set()
-PEOPLE: Set[str] = set()
-MOVIES: List[Movie] = []
+@dataclass()
+class MovieData:
+    '''A class to store all movie-related data'''
+    genres: Set[str] = field(default_factory=set)
+    people: Set[str] = field(default_factory=set)
+    movies: List[Movie] = field(default_factory=list)
 
 
 def write_config(config: ConfigParser) -> None:
@@ -170,14 +173,12 @@ def get_plex_movie_sections(server: PlexServer) -> List[LibrarySection]:
     return movie_sections
 
 
-def parse_plex_movies(movie_sections: List[LibrarySection]) -> None:
+def parse_plex_movies(movie_sections: List[LibrarySection]) -> MovieData:
     '''Parse all movies in the list of movie library sections.
 
     Populate the global list of movies, genres, and people from Plex
     '''
-    global MOVIES  # noqa: W0603
-    global GENRES  # noqa: W0603
-    global PEOPLE  # noqa: W0603
+    movie_data: MovieData = MovieData()
 
     movie_count = 1
     for section in movie_sections:
@@ -189,36 +190,38 @@ def parse_plex_movies(movie_sections: List[LibrarySection]) -> None:
             writers: Set[str] = set()
             for person in media.writers:
                 person = person.tag
-                PEOPLE.add(person)
+                movie_data.people.add(person)
                 writers.add(person)
             directors: Set[str] = set()
             for person in media.directors:
                 person = person.tag
-                PEOPLE.add(person)
+                movie_data.people.add(person)
                 directors.add(person)
             actors: Set[str] = set()
             for person in media.roles:
                 person = person.tag
-                PEOPLE.add(person)
+                movie_data.people.add(person)
                 actors.add(person)
             genres: Set[str] = set()
             for genre in media.genres:
                 genre = genre.tag
-                GENRES.add(genre)
+                movie_data.genres.add(genre)
                 genres.add(genre)
-            MOVIES.append(Movie(name=media.title,
-                                year=int(media.year or 1900),
-                                studio=media.studio,
-                                content_rating=media.contentRating,
-                                rating=media.rating,
-                                writers=tuple(writers),
-                                directors=tuple(directors),
-                                actors=tuple(actors),
-                                genres=tuple(genres),
-                                ))
+            movie_data.movies.append(
+                Movie(name=media.title,
+                      year=int(media.year or 1900),
+                      studio=media.studio,
+                      content_rating=media.contentRating,
+                      rating=media.rating,
+                      writers=tuple(writers),
+                      directors=tuple(directors),
+                      actors=tuple(actors),
+                      genres=tuple(genres),
+                      ))
+    return movie_data
 
 
-def write_shelve() -> None:
+def write_shelve(movie_data: MovieData) -> None:
     '''Store the global list of Movies, Genres, and People on disk
 
     To avoid pulling data from the plex server on each run we write
@@ -226,25 +229,23 @@ def write_shelve() -> None:
     '''
     # Opening with mode 'n' will always create a new, empty database
     with shelve.open('shelve', 'n') as data:
-        data['MOVIES'] = MOVIES
-        data['GENRES'] = GENRES
-        data['PEOPLE'] = PEOPLE
+        data['MOVIES'] = movie_data.movies
+        data['GENRES'] = movie_data.genres
+        data['PEOPLE'] = movie_data.people
 
 
-def read_shelve() -> None:
+def read_shelve() -> MovieData:
     '''Read the global list of Movies, Genres, and People from disk
 
     To avoid pulling data from the plex server on each run we use
     a python shelve file to persist data between runs.
     '''
-    global MOVIES  # noqa: W0603
-    global GENRES  # noqa: W0603
-    global PEOPLE  # noqa: W0603
-
+    movie_data: MovieData = MovieData()
     with shelve.open('shelve', 'r') as data:
-        MOVIES = data['MOVIES']
-        GENRES = data['GENRES']
-        PEOPLE = data['PEOPLE']
+        movie_data.movies = data['MOVIES']
+        movie_data.genres = data['GENRES']
+        movie_data.people = data['PEOPLE']
+    return movie_data
 
 
 def generate_data() -> None:
@@ -259,42 +260,42 @@ def generate_data() -> None:
     for server in servers:
         print(f'Indexing server {server.name}')
         movie_sections = get_plex_movie_sections(server)
-        parse_plex_movies(movie_sections)
-    write_shelve()
+        movie_data: MovieData = parse_plex_movies(movie_sections)
+    write_shelve(movie_data)
 
 
 def graph_data() -> None:
     '''Experiment with graphing Movie and Actor relationships'''
     print('Loading data from disk...', end='')
-    read_shelve()
+    movie_data: MovieData = read_shelve()
     print('done')
 
     # Count the number of movies an actor appears in
-    actors = {person: 0 for person in PEOPLE}
-    for movie in MOVIES:
+    actors = {person: 0 for person in movie_data.people}
+    for movie in movie_data.movies:
         for actor in movie.actors:
             actors[actor] = actors[actor] + 1
 
     # Drop people that are connected to less than {MIN_RELATIONS} movies
     # And right now that will be actors
     drops = set()
-    for person in PEOPLE:
+    for person in movie_data.people:
         if actors[person] < MIN_RELATIONS:
             drops.add(person)
-    print(f'There are {len(PEOPLE)} actors total')
-    people = PEOPLE - drops
+    print(f'There are {len(movie_data.people)} actors total')
+    movie_data.people = movie_data.people - drops
     print(f'Dropping actors with less than {MIN_RELATIONS} movies leaves '
-          f'{len(people)} actors')
+          f'{len(movie_data.people)} actors')
 
     graph = nx.Graph(name='Movie/Actor relationships')
-    for person in people:
+    for person in movie_data.people:
         graph.add_node(person)
 
     movie_count = 0
-    for movie in MOVIES:
+    for movie in movie_data.movies:
         relation_found = False
         for actor in movie.actors:
-            if actor in people:
+            if actor in movie_data.people:
                 if not relation_found:
                     # Only add a movie if we'll have an actor associated
                     movie_count += 1
