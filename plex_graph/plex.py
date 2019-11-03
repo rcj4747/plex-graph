@@ -18,10 +18,6 @@ from plexapi.library import LibrarySection
 from plexapi.myplex import MyPlexAccount, MyPlexResource
 from plexapi.server import PlexServer
 
-MIN_RELATIONS: int = 11
-PLEX_USER: str = ''
-PLEX_PASS: str = ''
-
 CONFIG_PATH: Path = Path.home().joinpath('.config', 'plex-graph')
 CONFIG_FILE: Path = CONFIG_PATH / 'config.ini'
 SHELVE_PATH: Path = Path.home().joinpath('.cache', 'plex-graph')
@@ -69,20 +65,24 @@ class MovieData:
 def write_config(config: ConfigParser) -> None:
     '''Store plex server authentication on disk'''
     if not CONFIG_PATH.exists():
+        logging.debug('Creating config directory %s', CONFIG_PATH)
         CONFIG_PATH.mkdir(parents=True)
+    logging.debug('Storing/updating Plex server connection data')
     with CONFIG_FILE.open(mode='w') as config_file:
         config.write(config_file)
 
 
-def generate_config(user: str, password: str) -> None:
-    '''Build the ConfigParser data for plex server authentication'''
+def plex_account_auth(user: str, password: str) -> None:
+    '''Authenticate with Plex service and store plex server keys'''
     config: ConfigParser = ConfigParser()
     account: MyPlexAccount = MyPlexAccount(user, password)
+    logging.debug('Authenticated to account %s', account.username)
 
     servers: List[MyPlexResource]
     servers = [resource for resource in account.resources()
                if 'server' in resource.provides.split(',')]
     for server in servers:
+        logging.debug('Retrieved connection data for server "%s"', server.name)
         config[f'server:{server.name}'] = {
             'baseurls': str([conn.httpuri for conn in server.connections]),
             'token': server.accessToken,
@@ -161,6 +161,8 @@ def update_config(config: ConfigParser,
 
     for server in servers:
         if server.lasturl:
+            logging.debug('Adding lasturl(%s) for %s',
+                          server.lasturl, server.name)
             config[f'server:{server.name}']['lasturl'] = server.lasturl
     write_config(config)
     return config
@@ -263,8 +265,6 @@ def generate_data() -> None:
     '''Glue code incorporating all the functions to read data from plex
     and generate our data for future runs.
     '''
-    if PLEX_USER and PLEX_PASS:
-        generate_config(PLEX_USER, PLEX_PASS)
     config = read_config()
     servers = get_servers(config)
     config = update_config(config, servers)
@@ -275,7 +275,7 @@ def generate_data() -> None:
     write_shelve(movie_data)
 
 
-def graph_data() -> None:
+def graph_data(min_relations: int) -> None:
     '''Experiment with graphing Movie and Actor relationships'''
     logging.info('Loading data from disk')
     movie_data: MovieData = read_shelve()
@@ -286,16 +286,16 @@ def graph_data() -> None:
         for actor in movie.actors:
             actors[actor] = actors[actor] + 1
 
-    # Drop people that are connected to less than {MIN_RELATIONS} movies
+    # Drop people that are connected to less than {min_relations} movies
     # And right now that will be actors
     drops = set()
     for person in movie_data.people:
-        if actors[person] < MIN_RELATIONS:
+        if actors[person] < min_relations:
             drops.add(person)
     logging.info('There are %d actors total', len(movie_data.people))
     movie_data.people = movie_data.people - drops
     logging.info('Dropping actors with less than %d movies leaves %d actors',
-                 MIN_RELATIONS, len(movie_data.people))
+                 min_relations, len(movie_data.people))
 
     graph = nx.Graph(name='Movie/Actor relationships')
     for person in movie_data.people:

@@ -16,14 +16,31 @@ def setup_logging(debug: bool = False) -> None:
     logging.basicConfig(level=level)
 
 
-@click.command()
-@click.option('--verbose', default=False)
+@click.group()
+@click.option('-v', '--verbose', is_flag=True, default=False)
 def plex_graph(verbose: bool) -> None:
     '''CLI entry-point'''
     setup_logging(debug=verbose)
-    # plex.generate_data()
-    plex.graph_data()
 
+
+@click.command()
+@click.option('-u', '--user', prompt='Plex user name')
+@click.option('-p', '--password', prompt='Plex password', hide_input=True)
+def auth(user: str, password: str) -> None:
+    '''Authenticate to Plex'''
+    plex.plex_account_auth(user, password)
+
+
+@click.command()
+@click.option('-r', '--relationships', default=11, show_default=True,
+              help='Required minimum movies to display an actor')
+def graph(relationships: int) -> None:
+    '''Display a graph of movie / actor relationships'''
+    plex.graph_data(relationships)
+
+
+plex_graph.add_command(auth)
+plex_graph.add_command(graph)
 
 if __name__ == '__main__':
     plex_graph(obj={})
