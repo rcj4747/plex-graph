@@ -4,6 +4,7 @@ Playing around with pulling movie data from plex servers and graphing
 relationships between movies via actors.
 '''
 import ast
+import logging
 import shelve
 from configparser import ConfigParser
 from dataclasses import dataclass, field
@@ -20,6 +21,14 @@ MIN_RELATIONS: int = 11
 PLEX_USER: str = ''
 PLEX_PASS: str = ''
 CONFIG_FILE: str = 'config.ini'
+
+
+def setup_logging(debug: bool = False) -> None:
+    '''Configure logging and set default output to INFO or DEBUG'''
+    level = logging.INFO
+    if debug:
+        level = logging.DEBUG
+    logging.basicConfig(level=level)
 
 
 @dataclass()
@@ -104,21 +113,21 @@ def get_servers(config: ConfigParser) -> List[PlexServerConfig]:
             servers.append(server)
 
     for server in servers:
-        print(f'Connecting to server {server.name}')
+        logging.info(f'Connecting to server {server.name}')
         connection = None
 
         # See if the last used URL works
         if server.lasturl:
             try:
-                print(f' Trying {server.lasturl} ... ', end='')
+                logging.debug(f'Trying {server.lasturl}')
                 connection = PlexServer(baseurl=server.lasturl,
                                         token=server.token,
                                         timeout=5)
-                print('connected')
+                logging.debug('Connected')
                 server.connection = connection
                 continue
             except requests.exceptions.ConnectTimeout:
-                print('no connection')
+                logging.debug('No connection')
 
         # Try connecting to all possible URLs
         for url in server.urls:
@@ -127,18 +136,18 @@ def get_servers(config: ConfigParser) -> List[PlexServerConfig]:
                 if url == server.lasturl:
                     continue
             try:
-                print(f' Trying {url} ... ', end='')
+                logging.debug(f'Trying {url}')
                 connection = PlexServer(baseurl=url,
                                         token=server.token,
                                         timeout=5)
-                print('connected')
+                logging.debug('Connected')
                 server.lasturl = url
                 server.connection = connection
                 break
             except requests.exceptions.ConnectTimeout:
-                print('no connection')
+                logging.debug('No connection')
         if not connection:
-            print(f'No connection could be made to {server.name}')
+            logging.info(f'No connection could be made to {server.name}')
     return servers
 
 
@@ -169,7 +178,7 @@ def get_plex_movie_sections(server: PlexServer) -> List[LibrarySection]:
     movie_sections = [section for section in
                       server['connection'].library.sections()
                       if section.title == 'Movies']
-    print(f'Found movie section(s) {movie_sections}')
+    logging.debug(f'Found movie section(s) {movie_sections}')
     return movie_sections
 
 
@@ -184,7 +193,8 @@ def parse_plex_movies(movie_sections: List[LibrarySection]) -> MovieData:
     for section in movie_sections:
         movie_total = len(section.all())
         for media in section.all():
-            print(f'Processing({movie_count}/{movie_total}) "{media.title}"')
+            logging.info(f'Processing({movie_count}/{movie_total}) '
+                         f'"{media.title}"')
             movie_count += 1
             media.reload()  # Get full object metadata
             writers: Set[str] = set()
@@ -258,7 +268,7 @@ def generate_data() -> None:
     servers = get_servers(config)
     config = update_config(config, servers)
     for server in servers:
-        print(f'Indexing server {server.name}')
+        logging.info(f'Indexing server {server.name}')
         movie_sections = get_plex_movie_sections(server)
         movie_data: MovieData = parse_plex_movies(movie_sections)
     write_shelve(movie_data)
@@ -266,9 +276,9 @@ def generate_data() -> None:
 
 def graph_data() -> None:
     '''Experiment with graphing Movie and Actor relationships'''
-    print('Loading data from disk...', end='')
+    logging.info('Loading data from disk')
     movie_data: MovieData = read_shelve()
-    print('done')
+    logging.info('Done')
 
     # Count the number of movies an actor appears in
     actors = {person: 0 for person in movie_data.people}
@@ -282,10 +292,10 @@ def graph_data() -> None:
     for person in movie_data.people:
         if actors[person] < MIN_RELATIONS:
             drops.add(person)
-    print(f'There are {len(movie_data.people)} actors total')
+    logging.info(f'There are {len(movie_data.people)} actors total')
     movie_data.people = movie_data.people - drops
-    print(f'Dropping actors with less than {MIN_RELATIONS} movies leaves '
-          f'{len(movie_data.people)} actors')
+    logging.info(f'Dropping actors with less than {MIN_RELATIONS} movies '
+                 f'leaves {len(movie_data.people)} actors')
 
     graph = nx.Graph(name='Movie/Actor relationships')
     for person in movie_data.people:
@@ -302,13 +312,14 @@ def graph_data() -> None:
                     graph.add_node(movie)
                     relation_found = True
                 graph.add_edge(movie, actor)
-    print(f'Now there are only {movie_count} movies')
+    logging.info(f'Now there are only {movie_count} movies')
 
-    print(nx.classes.function.info(graph))
+    logging.info(nx.classes.function.info(graph))
     nx.draw(graph, node_color='r', edge_color='b', with_labels=True)
     plot.show()
 
 
 if __name__ == '__main__':
+    setup_logging()
     # generate_data()
     graph_data()
