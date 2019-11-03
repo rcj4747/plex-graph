@@ -18,9 +18,9 @@ from plexapi.myplex import MyPlexAccount, MyPlexResource
 from plexapi.server import PlexServer
 
 CONFIG_PATH: Path = Path.home().joinpath('.config', 'plex-graph')
-CONFIG_FILE: Path = CONFIG_PATH / 'config.ini'
+CONFIG_FILE: Path = CONFIG_PATH / 'plex_servers'
 SHELVE_PATH: Path = Path.home().joinpath('.cache', 'plex-graph')
-SHELVE_FILE: Path = SHELVE_PATH / 'shelve'
+SHELVE_FILE: Path = SHELVE_PATH / 'movie_data'
 
 
 @dataclass()
