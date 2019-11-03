@@ -3,6 +3,7 @@ Playing around with pulling movie data from plex servers and graphing
 relationships between movies via actors.
 '''
 import logging
+import math
 import shelve
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -74,9 +75,31 @@ def cache_read() -> MovieData:
                            'and regenerate data')
 
 
+def rating_histogram() -> None:
+    logging.debug('Loading data from disk')
+    movie_data: MovieData = cache_read()
+
+    hist = [0 for x in range(10)]
+    for movie in movie_data.movies:
+        if not movie.rating:
+            continue
+        rating = float(movie.rating)
+        rating_int = int(rating)
+        i = math.floor(rating) + (0 if ((rating - rating_int) * 10) < 5 else 1)
+        hist[i - 1] += 1
+    print('rating:   ', end='')
+    for idx in range(1, 11):
+        print(f'{idx: 4}', end='')
+    print()
+    print('#movies:  ', end='')
+    for idx in range(0, 10):
+        print(f'{hist[idx]: 4}', end='')
+    print()
+
+
 def graph(min_relations: int) -> None:
     '''Experiment with graphing Movie and Actor relationships'''
-    logging.info('Loading data from disk')
+    logging.debug('Loading data from disk')
     movie_data: MovieData = cache_read()
 
     # Count the number of movies an actor appears in

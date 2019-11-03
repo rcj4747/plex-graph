@@ -52,9 +52,16 @@ def graph(relationships: int) -> None:
     data.graph(relationships)
 
 
+@click.command()
+def ratings() -> None:
+    '''Analyze movie ratings'''
+    data.rating_histogram()
+
+
 plex_graph.add_command(auth)
 plex_graph.add_command(harvest)
 plex_graph.add_command(graph)
+plex_graph.add_command(ratings)
 
 if __name__ == '__main__':
     plex_graph(verbose=False)
