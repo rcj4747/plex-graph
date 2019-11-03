@@ -43,4 +43,4 @@ plex_graph.add_command(auth)
 plex_graph.add_command(graph)
 
 if __name__ == '__main__':
-    plex_graph(obj={})
+    plex_graph()
