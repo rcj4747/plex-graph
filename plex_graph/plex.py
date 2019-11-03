@@ -28,14 +28,6 @@ SHELVE_PATH: Path = Path.home().joinpath('.cache', 'plex-graph')
 SHELVE_FILE: Path = SHELVE_PATH / 'shelve'
 
 
-def setup_logging(debug: bool = False) -> None:
-    '''Configure logging and set default output to INFO or DEBUG'''
-    level = logging.INFO
-    if debug:
-        level = logging.DEBUG
-    logging.basicConfig(level=level)
-
-
 @dataclass()
 class PlexServerConfig:
     '''PlexServer connection data'''
@@ -325,9 +317,3 @@ def graph_data() -> None:
     logging.info(nx.classes.function.info(graph))
     nx.draw(graph, node_color='r', edge_color='b', with_labels=True)
     plot.show()
-
-
-if __name__ == '__main__':
-    setup_logging()
-    # generate_data()
-    graph_data()

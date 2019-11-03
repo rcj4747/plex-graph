@@ -25,7 +25,7 @@ setup(
     install_requires=dependencies,
     entry_points={
         'console_scripts': [
-            'plex-graph = plex_graph.cli:main',
+            'plex-graph = plex_graph.cli:plex_graph',
         ],
     },
 )

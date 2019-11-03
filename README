@@ -21,5 +21,4 @@ TODO
 - Consider moving to another visualization library like
 https://pypi.org/project/nxviz/.  nxviz provides node coloring, etc.
 Or https://github.com/WestHealth/pyvis which is interactive.
-- Add an actual CLI with click
 - A GUI?
