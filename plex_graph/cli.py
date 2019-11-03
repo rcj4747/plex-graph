@@ -5,7 +5,7 @@ import logging
 
 import click
 
-from plex_graph import plex
+from plex_graph import data, plex
 
 
 def setup_logging(debug: bool = False) -> None:
@@ -19,7 +19,7 @@ def setup_logging(debug: bool = False) -> None:
 @click.group()
 @click.option('-v', '--verbose', is_flag=True, default=False)
 def plex_graph(verbose: bool) -> None:
-    '''CLI entry-point'''
+    '''Graph relationships between Movies in a Plex server library'''
     setup_logging(debug=verbose)
 
 
@@ -27,8 +27,21 @@ def plex_graph(verbose: bool) -> None:
 @click.option('-u', '--user', prompt='Plex user name')
 @click.option('-p', '--password', prompt='Plex password', hide_input=True)
 def auth(user: str, password: str) -> None:
-    '''Authenticate to Plex'''
-    plex.plex_account_auth(user, password)
+    '''Authenticate to Plex services and discover media servers'''
+    plex.account_auth(user, password)
+
+
+@click.command()
+def harvest() -> None:
+    '''Gather Movie data from Plex servers'''
+    config = plex.server_read()
+    servers = plex.get_servers(config)
+    config = plex.server_config_update(config, servers)
+    for server in servers:
+        logging.info('Indexing server %s', server.name)
+        movie_sections = plex.get_movie_sections(server)
+        movie_data: data.MovieData = plex.parse_movies(movie_sections)
+    data.cache_store(movie_data)
 
 
 @click.command()
@@ -36,11 +49,12 @@ def auth(user: str, password: str) -> None:
               help='Required minimum movies to display an actor')
 def graph(relationships: int) -> None:
     '''Display a graph of movie / actor relationships'''
-    plex.data_graph(relationships)
+    data.graph(relationships)
 
 
 plex_graph.add_command(auth)
+plex_graph.add_command(harvest)
 plex_graph.add_command(graph)
 
 if __name__ == '__main__':
-    plex_graph()
+    plex_graph(verbose=False)

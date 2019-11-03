@@ -4,26 +4,22 @@ relationships between movies via actors.
 '''
 import ast
 import logging
-import shelve
 from configparser import ConfigParser
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Set, Tuple
+from typing import List, Optional, Set
 
-import matplotlib.pyplot as plot
-import networkx as nx
 import plexapi
 import requests
 from plexapi.library import LibrarySection
 from plexapi.myplex import MyPlexAccount, MyPlexResource
 from plexapi.server import PlexServer
 
+from plex_graph.data import Movie, MovieData
 from plex_graph.exceptions import PlexUserAuthFailure, UnknownFailure
 
 CONFIG_PATH: Path = Path.home().joinpath('.config', 'plex-graph')
 CONFIG_FILE: Path = CONFIG_PATH / 'plex_servers'
-SHELVE_PATH: Path = Path.home().joinpath('.cache', 'plex-graph')
-SHELVE_FILE: Path = SHELVE_PATH / 'movie_data'
 
 
 @dataclass()
@@ -36,35 +32,7 @@ class PlexServerConfig:
     connection: Optional[PlexServer] = None
 
 
-@dataclass(eq=True, frozen=True)
-class Movie:
-    '''Plex Movie data class comprised of nearly all data plex stores'''
-    name: str
-    year: int
-    studio: str
-    content_rating: str
-    rating: str
-    writers: Tuple[str, ...] = field(default_factory=tuple)
-    directors: Tuple[str, ...] = field(default_factory=tuple)
-    actors: Tuple[str, ...] = field(default_factory=tuple)
-    genres: Tuple[str, ...] = field(default_factory=tuple)
-
-    def __str__(self) -> str:
-        return f'{self.name}'
-
-    def __repr__(self) -> str:
-        return f'{self.name}'
-
-
-@dataclass()
-class MovieData:
-    '''A class to store all movie-related data'''
-    genres: Set[str] = field(default_factory=set)
-    people: Set[str] = field(default_factory=set)
-    movies: List[Movie] = field(default_factory=list)
-
-
-def plex_server_config_write(config: ConfigParser) -> None:
+def server_config_write(config: ConfigParser) -> None:
     '''Store plex server authentication on disk'''
     if not CONFIG_PATH.exists():
         logging.debug('Creating config directory %s', CONFIG_PATH)
@@ -74,7 +42,7 @@ def plex_server_config_write(config: ConfigParser) -> None:
         config.write(config_file)
 
 
-def plex_account_auth(user: str, password: str) -> None:
+def account_auth(user: str, password: str) -> None:
     '''Authenticate with Plex service and store plex server keys'''
     config: ConfigParser = ConfigParser()
     try:
@@ -96,10 +64,10 @@ def plex_account_auth(user: str, password: str) -> None:
             'baseurls': str([conn.httpuri for conn in server.connections]),
             'token': server.accessToken,
         }
-    plex_server_config_write(config)
+    server_config_write(config)
 
 
-def plex_server_read() -> ConfigParser:
+def server_read() -> ConfigParser:
     '''Read plex server authentication from disk.'''
     with CONFIG_FILE.open(mode='r') as config_file:
         config = ConfigParser()
@@ -107,7 +75,7 @@ def plex_server_read() -> ConfigParser:
     return config
 
 
-def plex_get_servers(config: ConfigParser) -> List[PlexServerConfig]:
+def get_servers(config: ConfigParser) -> List[PlexServerConfig]:
     '''Connect to plex servers from our config'''
     servers: List[PlexServerConfig] = []
     for key in list(config.keys()):
@@ -157,7 +125,7 @@ def plex_get_servers(config: ConfigParser) -> List[PlexServerConfig]:
     return servers
 
 
-def plex_server_config_update(
+def server_config_update(
         config: ConfigParser,
         servers: List[PlexServerConfig]) -> ConfigParser:
     '''
@@ -174,11 +142,11 @@ def plex_server_config_update(
             logging.debug('Adding lasturl(%s) for %s',
                           server.lasturl, server.name)
             config[f'server:{server.name}']['lasturl'] = server.lasturl
-    plex_server_config_write(config)
+    server_config_write(config)
     return config
 
 
-def plex_get_movie_sections(server: PlexServer) -> List[LibrarySection]:
+def get_movie_sections(server: PlexServer) -> List[LibrarySection]:
     '''
     Finds all 'Movie' library sections on a server.
 
@@ -191,7 +159,7 @@ def plex_get_movie_sections(server: PlexServer) -> List[LibrarySection]:
     return movie_sections
 
 
-def parse_plex_movies(movie_sections: List[LibrarySection]) -> MovieData:
+def parse_movies(movie_sections: List[LibrarySection]) -> MovieData:
     '''Parse all movies in the list of movie library sections.
 
     Populate the global list of movies, genres, and people from Plex
@@ -238,92 +206,3 @@ def parse_plex_movies(movie_sections: List[LibrarySection]) -> MovieData:
                       genres=tuple(genres),
                       ))
     return movie_data
-
-
-def data_store(movie_data: MovieData) -> None:
-    '''Store the global list of Movies, Genres, and People on disk
-
-    To avoid pulling data from the plex server on each run we write
-    a python shelve file.
-    '''
-    if not SHELVE_PATH.exists():
-        SHELVE_PATH.mkdir(parents=True)
-    # Opening with mode 'n' will always create a new, empty database
-    with shelve.open(str(SHELVE_FILE), 'n') as data:
-        data['version'] = 1
-        data['movie_data'] = movie_data
-
-
-def data_read() -> MovieData:
-    '''Read the global list of Movies, Genres, and People from disk
-
-    To avoid pulling data from the plex server on each run we use
-    a python shelve file to persist data between runs.
-    '''
-    movie_data: MovieData = MovieData()
-    with shelve.open(str(SHELVE_FILE), 'r') as data:
-        if 'version' in data:
-            logging.debug('Found version:%d data', data['version'])
-            if data['version'] == 1:
-                movie_data = data['movie_data']
-                return movie_data
-        raise RuntimeError(f'Unknown data format, remove {SHELVE_FILE} '
-                           'and regenerate data')
-
-
-def data_generate() -> None:
-    '''Glue code incorporating all the functions to read data from plex
-    and generate our data for future runs.
-    '''
-    config = plex_server_read()
-    servers = plex_get_servers(config)
-    config = plex_server_config_update(config, servers)
-    for server in servers:
-        logging.info('Indexing server %s', server.name)
-        movie_sections = plex_get_movie_sections(server)
-        movie_data: MovieData = parse_plex_movies(movie_sections)
-    data_store(movie_data)
-
-
-def data_graph(min_relations: int) -> None:
-    '''Experiment with graphing Movie and Actor relationships'''
-    logging.info('Loading data from disk')
-    movie_data: MovieData = data_read()
-
-    # Count the number of movies an actor appears in
-    actors = {person: 0 for person in movie_data.people}
-    for movie in movie_data.movies:
-        for actor in movie.actors:
-            actors[actor] = actors[actor] + 1
-
-    # Drop people that are connected to less than {min_relations} movies
-    # And right now that will be actors
-    drops = set()
-    for person in movie_data.people:
-        if actors[person] < min_relations:
-            drops.add(person)
-    logging.info('There are %d actors total', len(movie_data.people))
-    movie_data.people = movie_data.people - drops
-    logging.info('Dropping actors with less than %d movies leaves %d actors',
-                 min_relations, len(movie_data.people))
-
-    graph = nx.Graph(name='Movie/Actor relationships')
-    for person in movie_data.people:
-        graph.add_node(person)
-
-    movie_count = 0
-    for movie in movie_data.movies:
-        relation_found = False
-        for actor in movie.actors:
-            if actor in movie_data.people:
-                if not relation_found:
-                    # Only add a movie if we'll have an actor associated
-                    movie_count += 1
-                    graph.add_node(movie)
-                    relation_found = True
-                graph.add_edge(movie, actor)
-    logging.info('Now there are only %d movies', movie_count)
-
-    logging.info(nx.classes.function.info(graph))
-    nx.draw(graph, node_color='r', edge_color='b', with_labels=True)
-    plot.show()

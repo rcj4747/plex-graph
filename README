@@ -1,12 +1,12 @@
-Work-in-progress
-
 Plex-graph -- graph relationships between movies on your plex server(s).
 
 - Movie data is cached so graphing can be tweaked without repeatedly
    indexing from the plex server(s).
 
 plex_graph/cli.py - Command-line interface code
-plex_graph/plex.py - All the remaining logic is dumped in this file (for now)
+plex_graph/plex.py - All logic for interfacing with the Plex service and media servers
+plex_graph/data.py - All logic for working with Movie data
+plex_graph/exceptions.py - Exceptions for this package
 
 FILES
 ~/.config/plex-graph/plex_servers
