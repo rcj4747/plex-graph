@@ -8,6 +8,7 @@ import logging
 import shelve
 from configparser import ConfigParser
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import List, Optional, Set, Tuple
 
 import matplotlib.pyplot as plot
@@ -20,7 +21,11 @@ from plexapi.server import PlexServer
 MIN_RELATIONS: int = 11
 PLEX_USER: str = ''
 PLEX_PASS: str = ''
-CONFIG_FILE: str = 'config.ini'
+
+CONFIG_PATH: Path = Path.home().joinpath('.config', 'plex-graph')
+CONFIG_FILE: Path = CONFIG_PATH / 'config.ini'
+SHELVE_PATH: Path = Path.home().joinpath('.cache', 'plex-graph')
+SHELVE_FILE: Path = SHELVE_PATH / 'shelve'
 
 
 def setup_logging(debug: bool = False) -> None:
@@ -71,7 +76,9 @@ class MovieData:
 
 def write_config(config: ConfigParser) -> None:
     '''Store plex server authentication on disk'''
-    with open(CONFIG_FILE, 'w') as config_file:
+    if not CONFIG_PATH.exists():
+        CONFIG_PATH.mkdir(parents=True)
+    with CONFIG_FILE.open(mode='w') as config_file:
         config.write(config_file)
 
 
@@ -93,7 +100,7 @@ def generate_config(user: str, password: str) -> None:
 
 def read_config() -> ConfigParser:
     '''Read plex server authentication from disk.'''
-    with open(CONFIG_FILE, 'r') as config_file:
+    with CONFIG_FILE.open(mode='r') as config_file:
         config = ConfigParser()
         config.read_file(config_file)
     return config
@@ -235,8 +242,10 @@ def write_shelve(movie_data: MovieData) -> None:
     To avoid pulling data from the plex server on each run we write
     a python shelve file.
     '''
+    if not SHELVE_PATH.exists():
+        SHELVE_PATH.mkdir(parents=True)
     # Opening with mode 'n' will always create a new, empty database
-    with shelve.open('shelve', 'n') as data:
+    with shelve.open(str(SHELVE_FILE), 'n') as data:
         data['version'] = 1
         data['movie_data'] = movie_data
 
@@ -248,13 +257,13 @@ def read_shelve() -> MovieData:
     a python shelve file to persist data between runs.
     '''
     movie_data: MovieData = MovieData()
-    with shelve.open('shelve', 'r') as data:
+    with shelve.open(str(SHELVE_FILE), 'r') as data:
         if 'version' in data:
             logging.debug('Found version:%d data', data['version'])
             if data['version'] == 1:
                 movie_data = data['movie_data']
                 return movie_data
-        raise RuntimeError('Unknown data format, remove "shelve" file '
+        raise RuntimeError(f'Unknown data format, remove {SHELVE_FILE} '
                            'and regenerate data')
 
 
