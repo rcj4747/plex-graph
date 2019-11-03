@@ -12,10 +12,13 @@ from typing import List, Optional, Set, Tuple
 
 import matplotlib.pyplot as plot
 import networkx as nx
+import plexapi
 import requests
 from plexapi.library import LibrarySection
 from plexapi.myplex import MyPlexAccount, MyPlexResource
 from plexapi.server import PlexServer
+
+from plex_graph.exceptions import PlexUserAuthFailure, UnknownFailure
 
 CONFIG_PATH: Path = Path.home().joinpath('.config', 'plex-graph')
 CONFIG_FILE: Path = CONFIG_PATH / 'plex_servers'
@@ -74,7 +77,14 @@ def write_config(config: ConfigParser) -> None:
 def plex_account_auth(user: str, password: str) -> None:
     '''Authenticate with Plex service and store plex server keys'''
     config: ConfigParser = ConfigParser()
-    account: MyPlexAccount = MyPlexAccount(user, password)
+    try:
+        account: MyPlexAccount = MyPlexAccount(user, password)
+    except plexapi.exceptions.BadRequest as excp:
+        if excp.startswith('(401) unauthorized'):
+            raise PlexUserAuthFailure(
+                'Plex user name or password is incorrect')
+        raise UnknownFailure('Received "BadRequest" from plexapi: %s',
+                             excp)
     logging.debug('Authenticated to account %s', account.username)
 
     servers: List[MyPlexResource]
