@@ -174,7 +174,7 @@ def get_plex_movie_sections(server: PlexServer) -> List[LibrarySection]:
     Returns a list of plexapi.library.MovieSection objects
     '''
     movie_sections = [section for section in
-                      server['connection'].library.sections()
+                      server.connection.library.sections()
                       if section.title == 'Movies']
     logging.debug('Found movie section(s) %s', movie_sections)
     return movie_sections
