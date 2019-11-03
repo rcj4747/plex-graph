@@ -113,21 +113,20 @@ def get_servers(config: ConfigParser) -> List[PlexServerConfig]:
             servers.append(server)
 
     for server in servers:
-        logging.info(f'Connecting to server {server.name}')
+        logging.info('Connecting to server %s', server.name)
         connection = None
 
         # See if the last used URL works
         if server.lasturl:
             try:
-                logging.debug(f'Trying {server.lasturl}')
+                logging.debug('Trying %s', server.lasturl)
                 connection = PlexServer(baseurl=server.lasturl,
                                         token=server.token,
                                         timeout=5)
-                logging.debug('Connected')
                 server.connection = connection
                 continue
             except requests.exceptions.ConnectTimeout:
-                logging.debug('No connection')
+                logging.debug('No connection via %s', server.lasturl)
 
         # Try connecting to all possible URLs
         for url in server.urls:
@@ -136,18 +135,17 @@ def get_servers(config: ConfigParser) -> List[PlexServerConfig]:
                 if url == server.lasturl:
                     continue
             try:
-                logging.debug(f'Trying {url}')
+                logging.debug('Trying %s', url)
                 connection = PlexServer(baseurl=url,
                                         token=server.token,
                                         timeout=5)
-                logging.debug('Connected')
                 server.lasturl = url
                 server.connection = connection
                 break
             except requests.exceptions.ConnectTimeout:
-                logging.debug('No connection')
+                logging.debug('No connection via %s', url)
         if not connection:
-            logging.info(f'No connection could be made to {server.name}')
+            logging.info('No connection could be made to %s', server.name)
     return servers
 
 
@@ -178,7 +176,7 @@ def get_plex_movie_sections(server: PlexServer) -> List[LibrarySection]:
     movie_sections = [section for section in
                       server['connection'].library.sections()
                       if section.title == 'Movies']
-    logging.debug(f'Found movie section(s) {movie_sections}')
+    logging.debug('Found movie section(s) %s', movie_sections)
     return movie_sections
 
 
@@ -193,8 +191,8 @@ def parse_plex_movies(movie_sections: List[LibrarySection]) -> MovieData:
     for section in movie_sections:
         movie_total = len(section.all())
         for media in section.all():
-            logging.info(f'Processing({movie_count}/{movie_total}) '
-                         f'"{media.title}"')
+            logging.info('Processing(%d/%d) "%s"',
+                         movie_count, movie_total, media.title)
             movie_count += 1
             media.reload()  # Get full object metadata
             writers: Set[str] = set()
@@ -268,7 +266,7 @@ def generate_data() -> None:
     servers = get_servers(config)
     config = update_config(config, servers)
     for server in servers:
-        logging.info(f'Indexing server {server.name}')
+        logging.info('Indexing server %s', server.name)
         movie_sections = get_plex_movie_sections(server)
         movie_data: MovieData = parse_plex_movies(movie_sections)
     write_shelve(movie_data)
@@ -278,7 +276,6 @@ def graph_data() -> None:
     '''Experiment with graphing Movie and Actor relationships'''
     logging.info('Loading data from disk')
     movie_data: MovieData = read_shelve()
-    logging.info('Done')
 
     # Count the number of movies an actor appears in
     actors = {person: 0 for person in movie_data.people}
@@ -292,10 +289,10 @@ def graph_data() -> None:
     for person in movie_data.people:
         if actors[person] < MIN_RELATIONS:
             drops.add(person)
-    logging.info(f'There are {len(movie_data.people)} actors total')
+    logging.info('There are %d actors total', len(movie_data.people))
     movie_data.people = movie_data.people - drops
-    logging.info(f'Dropping actors with less than {MIN_RELATIONS} movies '
-                 f'leaves {len(movie_data.people)} actors')
+    logging.info('Dropping actors with less than %d movies leaves %d actors',
+                 MIN_RELATIONS, len(movie_data.people))
 
     graph = nx.Graph(name='Movie/Actor relationships')
     for person in movie_data.people:
@@ -312,7 +309,7 @@ def graph_data() -> None:
                     graph.add_node(movie)
                     relation_found = True
                 graph.add_edge(movie, actor)
-    logging.info(f'Now there are only {movie_count} movies')
+    logging.info('Now there are only %d movies', movie_count)
 
     logging.info(nx.classes.function.info(graph))
     nx.draw(graph, node_color='r', edge_color='b', with_labels=True)
