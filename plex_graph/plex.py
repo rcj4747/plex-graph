@@ -237,9 +237,8 @@ def write_shelve(movie_data: MovieData) -> None:
     '''
     # Opening with mode 'n' will always create a new, empty database
     with shelve.open('shelve', 'n') as data:
-        data['MOVIES'] = movie_data.movies
-        data['GENRES'] = movie_data.genres
-        data['PEOPLE'] = movie_data.people
+        data['version'] = 1
+        data['movie_data'] = movie_data
 
 
 def read_shelve() -> MovieData:
@@ -250,10 +249,13 @@ def read_shelve() -> MovieData:
     '''
     movie_data: MovieData = MovieData()
     with shelve.open('shelve', 'r') as data:
-        movie_data.movies = data['MOVIES']
-        movie_data.genres = data['GENRES']
-        movie_data.people = data['PEOPLE']
-    return movie_data
+        if 'version' in data:
+            logging.debug('Found version:%d data', data['version'])
+            if data['version'] == 1:
+                movie_data = data['movie_data']
+                return movie_data
+        raise RuntimeError('Unknown data format, remove "shelve" file '
+                           'and regenerate data')
 
 
 def generate_data() -> None:
