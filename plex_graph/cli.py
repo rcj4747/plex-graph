@@ -36,7 +36,7 @@ def auth(user: str, password: str) -> None:
               help='Required minimum movies to display an actor')
 def graph(relationships: int) -> None:
     '''Display a graph of movie / actor relationships'''
-    plex.graph_data(relationships)
+    plex.data_graph(relationships)
 
 
 plex_graph.add_command(auth)

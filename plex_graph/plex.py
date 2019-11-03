@@ -64,7 +64,7 @@ class MovieData:
     movies: List[Movie] = field(default_factory=list)
 
 
-def write_config(config: ConfigParser) -> None:
+def plex_server_config_write(config: ConfigParser) -> None:
     '''Store plex server authentication on disk'''
     if not CONFIG_PATH.exists():
         logging.debug('Creating config directory %s', CONFIG_PATH)
@@ -96,10 +96,10 @@ def plex_account_auth(user: str, password: str) -> None:
             'baseurls': str([conn.httpuri for conn in server.connections]),
             'token': server.accessToken,
         }
-    write_config(config)
+    plex_server_config_write(config)
 
 
-def read_config() -> ConfigParser:
+def plex_server_read() -> ConfigParser:
     '''Read plex server authentication from disk.'''
     with CONFIG_FILE.open(mode='r') as config_file:
         config = ConfigParser()
@@ -107,7 +107,7 @@ def read_config() -> ConfigParser:
     return config
 
 
-def get_servers(config: ConfigParser) -> List[PlexServerConfig]:
+def plex_get_servers(config: ConfigParser) -> List[PlexServerConfig]:
     '''Connect to plex servers from our config'''
     servers: List[PlexServerConfig] = []
     for key in list(config.keys()):
@@ -157,8 +157,9 @@ def get_servers(config: ConfigParser) -> List[PlexServerConfig]:
     return servers
 
 
-def update_config(config: ConfigParser,
-                  servers: List[PlexServerConfig]) -> ConfigParser:
+def plex_server_config_update(
+        config: ConfigParser,
+        servers: List[PlexServerConfig]) -> ConfigParser:
     '''
     After connecting to servers, update ConfigParser data with lasturl data.
 
@@ -173,11 +174,11 @@ def update_config(config: ConfigParser,
             logging.debug('Adding lasturl(%s) for %s',
                           server.lasturl, server.name)
             config[f'server:{server.name}']['lasturl'] = server.lasturl
-    write_config(config)
+    plex_server_config_write(config)
     return config
 
 
-def get_plex_movie_sections(server: PlexServer) -> List[LibrarySection]:
+def plex_get_movie_sections(server: PlexServer) -> List[LibrarySection]:
     '''
     Finds all 'Movie' library sections on a server.
 
@@ -239,7 +240,7 @@ def parse_plex_movies(movie_sections: List[LibrarySection]) -> MovieData:
     return movie_data
 
 
-def write_shelve(movie_data: MovieData) -> None:
+def data_store(movie_data: MovieData) -> None:
     '''Store the global list of Movies, Genres, and People on disk
 
     To avoid pulling data from the plex server on each run we write
@@ -253,7 +254,7 @@ def write_shelve(movie_data: MovieData) -> None:
         data['movie_data'] = movie_data
 
 
-def read_shelve() -> MovieData:
+def data_read() -> MovieData:
     '''Read the global list of Movies, Genres, and People from disk
 
     To avoid pulling data from the plex server on each run we use
@@ -270,24 +271,24 @@ def read_shelve() -> MovieData:
                            'and regenerate data')
 
 
-def generate_data() -> None:
+def data_generate() -> None:
     '''Glue code incorporating all the functions to read data from plex
     and generate our data for future runs.
     '''
-    config = read_config()
-    servers = get_servers(config)
-    config = update_config(config, servers)
+    config = plex_server_read()
+    servers = plex_get_servers(config)
+    config = plex_server_config_update(config, servers)
     for server in servers:
         logging.info('Indexing server %s', server.name)
-        movie_sections = get_plex_movie_sections(server)
+        movie_sections = plex_get_movie_sections(server)
         movie_data: MovieData = parse_plex_movies(movie_sections)
-    write_shelve(movie_data)
+    data_store(movie_data)
 
 
-def graph_data(min_relations: int) -> None:
+def data_graph(min_relations: int) -> None:
     '''Experiment with graphing Movie and Actor relationships'''
     logging.info('Loading data from disk')
-    movie_data: MovieData = read_shelve()
+    movie_data: MovieData = data_read()
 
     # Count the number of movies an actor appears in
     actors = {person: 0 for person in movie_data.people}
