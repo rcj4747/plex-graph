@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 '''
 Playing around with pulling movie data from plex servers and graphing
 relationships between movies via actors.
