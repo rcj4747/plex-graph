@@ -51,8 +51,7 @@ def account_auth(user: str, password: str) -> None:
         if excp.startswith('(401) unauthorized'):
             raise PlexUserAuthFailure(
                 'Plex user name or password is incorrect')
-        raise UnknownFailure('Received "BadRequest" from plexapi: %s',
-                             excp)
+        raise UnknownFailure('Received "BadRequest" from plexapi: %s' % excp)
     logging.debug('Authenticated to account %s', account.username)
 
     servers: List[MyPlexResource]
