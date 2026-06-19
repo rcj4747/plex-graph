@@ -20,11 +20,13 @@ repos:
     -   id: check-merge-conflict
     -   id: debug-statements
     -   id: requirements-txt-fixer
--   repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v2.1.0
+-   repo: local
     hooks:
     -   id: mypy
-        args: [--strict, --ignore-missing-imports]
+        name: mypy
+        entry: poetry run mypy
+        language: system
+        types: [python]
 -   repo: https://github.com/pre-commit/mirrors-autopep8
     rev: v2.0.4
     hooks:
@@ -33,3 +35,4 @@ repos:
     rev: 7.3.0
     hooks:
     -   id: flake8
+        additional_dependencies: [Flake8-pyproject]

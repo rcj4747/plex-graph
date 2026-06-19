@@ -1,7 +1,8 @@
-'''
+"""
 Playing around with pulling movie data from plex servers and graphing
 relationships between movies via actors.
-'''
+"""
+
 import logging
 import math
 import shelve
@@ -12,13 +13,14 @@ from typing import List, Set, Tuple
 import matplotlib.pyplot as plot
 import networkx as nx
 
-SHELVE_PATH: Path = Path.home().joinpath('.cache', 'plex-graph')
-SHELVE_FILE: Path = SHELVE_PATH / 'movie_data'
+SHELVE_PATH: Path = Path.home().joinpath(".cache", "plex-graph")
+SHELVE_FILE: Path = SHELVE_PATH / "movie_data"
 
 
 @dataclass(eq=True, frozen=True)
 class Movie:
-    '''Plex Movie data class comprised of nearly all data plex stores'''
+    """Plex Movie data class comprised of nearly all data plex stores"""
+
     name: str
     year: int
     studio: str
@@ -30,53 +32,55 @@ class Movie:
     genres: Tuple[str, ...] = field(default_factory=tuple)
 
     def __str__(self) -> str:
-        return f'{self.name}'
+        return f"{self.name}"
 
     def __repr__(self) -> str:
-        return f'{self.name}'
+        return f"{self.name}"
 
 
 @dataclass()
 class MovieData:
-    '''A class to store all movie-related data'''
+    """A class to store all movie-related data"""
+
     genres: Set[str] = field(default_factory=set)
     people: Set[str] = field(default_factory=set)
     movies: List[Movie] = field(default_factory=list)
 
 
 def cache_store(movie_data: MovieData) -> None:
-    '''Store the global list of Movies, Genres, and People on disk
+    """Store the global list of Movies, Genres, and People on disk
 
     To avoid pulling data from the plex server on each run we write
     a python shelve file.
-    '''
+    """
     if not SHELVE_PATH.exists():
         SHELVE_PATH.mkdir(parents=True)
     # Opening with mode 'n' will always create a new, empty database
-    with shelve.open(str(SHELVE_FILE), 'n') as data:
-        data['version'] = 1
-        data['movie_data'] = movie_data
+    with shelve.open(str(SHELVE_FILE), "n") as data:
+        data["version"] = 1
+        data["movie_data"] = movie_data
 
 
 def cache_read() -> MovieData:
-    '''Read the global list of Movies, Genres, and People from disk
+    """Read the global list of Movies, Genres, and People from disk
 
     To avoid pulling data from the plex server on each run we use
     a python shelve file to persist data between runs.
-    '''
+    """
     movie_data: MovieData = MovieData()
-    with shelve.open(str(SHELVE_FILE), 'r') as data:
-        if 'version' in data:
-            logging.debug('Found version:%d data', data['version'])
-            if data['version'] == 1:
-                movie_data = data['movie_data']
+    with shelve.open(str(SHELVE_FILE), "r") as data:
+        if "version" in data:
+            logging.debug("Found version:%d data", data["version"])
+            if data["version"] == 1:
+                movie_data = data["movie_data"]
                 return movie_data
-        raise RuntimeError(f'Unknown data format, remove {SHELVE_FILE} '
-                           'and regenerate data')
+        raise RuntimeError(
+            f"Unknown data format, remove {SHELVE_FILE} " "and regenerate data"
+        )
 
 
 def rating_histogram() -> None:
-    logging.debug('Loading data from disk')
+    logging.debug("Loading data from disk")
     movie_data: MovieData = cache_read()
 
     hist = [0 for x in range(10)]
@@ -87,25 +91,27 @@ def rating_histogram() -> None:
         rating_int = int(rating)
         i = math.floor(rating) + (0 if ((rating - rating_int) * 10) < 5 else 1)
         hist[i - 1] += 1
-    print('rating:   ', end='')
+    print("rating:   ", end="")
     for idx in range(1, 11):
-        print(f'{idx: 4}', end='')
+        print(f"{idx: 4}", end="")
     print()
-    print('#movies:  ', end='')
+    print("#movies:  ", end="")
     for idx in range(0, 10):
-        print(f'{hist[idx]: 4}', end='')
+        print(f"{hist[idx]: 4}", end="")
     print()
 
 
-def graph(min_relations: int = 0,
-          display_actors: bool = True,
-          display_decades: bool = False,
-          display_contentratings: bool = False) -> None:
-    '''Experiment with graphing Movie and Actor relationships'''
-    logging.debug('Loading data from disk')
+def graph(
+    min_relations: int = 0,
+    display_actors: bool = True,
+    display_decades: bool = False,
+    display_contentratings: bool = False,
+) -> None:
+    """Experiment with graphing Movie and Actor relationships"""
+    logging.debug("Loading data from disk")
     movie_data: MovieData = cache_read()
 
-    people: Tuple[str] = tuple()
+    people: tuple[str, ...] = tuple()
     if display_actors:
         # Count the number of movies an actor appears in
         actors = {person: 0 for person in movie_data.people}
@@ -119,12 +125,15 @@ def graph(min_relations: int = 0,
         for person in movie_data.people:
             if actors[person] < min_relations:
                 drops.add(person)
-        logging.info('There are %d actors total', len(movie_data.people))
-        people = movie_data.people - drops
-        logging.info('Dropping actors with less than %d movies leaves '
-                     '%d actors', min_relations, len(people))
+        logging.info("There are %d actors total", len(movie_data.people))
+        people = tuple(movie_data.people - drops)
+        logging.info(
+            "Dropping actors with less than %d movies leaves " "%d actors",
+            min_relations,
+            len(people),
+        )
 
-    graph = nx.Graph(name='Movie/Actor relationships')
+    graph: nx.Graph[Movie | str] = nx.Graph(name="Movie/Actor relationships")
     # for person in people:
     #     graph.add_node(person)
 
@@ -132,7 +141,7 @@ def graph(min_relations: int = 0,
     for movie in movie_data.movies:
         relation_found = False
         if display_decades:
-            graph.add_edge(movie, str(movie.year)[:3] + '0')
+            graph.add_edge(movie, str(movie.year)[:3] + "0")
         for actor in movie.actors:
             if actor in people:
                 if not relation_found:
@@ -141,8 +150,8 @@ def graph(min_relations: int = 0,
                     # graph.add_node(movie)
                     relation_found = True
                 graph.add_edge(movie, actor)
-    logging.info('Now there are only %d movies', movie_count)
+    logging.info("Now there are only %d movies", movie_count)
 
-    logging.info(nx.classes.function.info(graph))
-    nx.draw(graph, node_color='r', edge_color='b', with_labels=True)
+    nx.classes.function.describe(graph)
+    nx.draw(graph, node_color="r", edge_color="b", with_labels=True)
     plot.show()

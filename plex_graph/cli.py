@@ -39,9 +39,12 @@ def harvest() -> None:
     config = plex.server_config_update(config, servers)
     for server in servers:
         logging.info('Indexing server %s', server.name)
-        movie_sections = plex.get_movie_sections(server)
+        if not server.connection:
+            logging.error("No connection available. Skipping.")
+            continue
+        movie_sections = plex.get_movie_sections(server.connection)
         movie_data: data.MovieData = plex.parse_movies(movie_sections)
-    data.cache_store(movie_data)
+        data.cache_store(movie_data)
 
 
 @click.command()

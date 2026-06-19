@@ -2,25 +2,41 @@
 name = "plex-graph"
 version = "0.1.0"
 description = "Graph relationships between movies on a plex server"
-authors = [
-    {name = "Robert C Jennings",email = "rcj4747@gmail.com"}
-]
-license = {text = "GPLv3"}
+authors = [{ name = "Robert C Jennings", email = "rcj4747@gmail.com" }]
+license = { text = "GPLv3" }
 requires-python = ">=3.12,<3.14"
 dependencies = [
     "click (>=8.3.1,<9.0.0)",
     "matplotlib (>=3.10.8,<4.0.0)",
     "networkx (>=3.6.1,<4.0.0)",
-    "plexapi (>=4.18.1,<5.0.0)"
+    "plexapi (>=4.18.1,<5.0.0)",
 ]
 
 [dependency-groups]
 dev = [
+    "mypy (>=2.1.0,<3.0.0)",
     "pre-commit (>=4.5.1,<5.0.0)",
-    "types-networkx (>=3.6.1.20260612,<4.0.0.0)"
+    "types-networkx (>=3.6.1.20260612,<4.0.0.0)",
+    "types-requests (>=2.33.0.20260518,<3.0.0.0)",
+    "types-setuptools (>=82.0.0.20260518,<83.0.0.0)",
 ]
 
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 88
+
+[tool.flake8]
+max-line-length = 88
+# E203 and W503 conflict with Black's formatting choices
+extend-ignore = ["E203", "W503"]
+
+[tool.mypy]
+strict = true
+
+[[tool.mypy.overrides]]
+module = "plex_graph.*"
+disallow_untyped_calls = false
