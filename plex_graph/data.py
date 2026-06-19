@@ -97,41 +97,48 @@ def rating_histogram() -> None:
     print()
 
 
-def graph(min_relations: int) -> None:
+def graph(min_relations: int = 0,
+          display_actors: bool = True,
+          display_decades: bool = False,
+          display_contentratings: bool = False) -> None:
     '''Experiment with graphing Movie and Actor relationships'''
     logging.debug('Loading data from disk')
     movie_data: MovieData = cache_read()
 
-    # Count the number of movies an actor appears in
-    actors = {person: 0 for person in movie_data.people}
-    for movie in movie_data.movies:
-        for actor in movie.actors:
-            actors[actor] = actors[actor] + 1
+    people: Tuple[str] = tuple()
+    if display_actors:
+        # Count the number of movies an actor appears in
+        actors = {person: 0 for person in movie_data.people}
+        for movie in movie_data.movies:
+            for actor in movie.actors:
+                actors[actor] = actors[actor] + 1
 
-    # Drop people that are connected to less than {min_relations} movies
-    # And right now that will be actors
-    drops = set()
-    for person in movie_data.people:
-        if actors[person] < min_relations:
-            drops.add(person)
-    logging.info('There are %d actors total', len(movie_data.people))
-    movie_data.people = movie_data.people - drops
-    logging.info('Dropping actors with less than %d movies leaves %d actors',
-                 min_relations, len(movie_data.people))
+        # Drop people that are connected to less than {min_relations} movies
+        # And right now that will be actors
+        drops = set()
+        for person in movie_data.people:
+            if actors[person] < min_relations:
+                drops.add(person)
+        logging.info('There are %d actors total', len(movie_data.people))
+        people = movie_data.people - drops
+        logging.info('Dropping actors with less than %d movies leaves '
+                     '%d actors', min_relations, len(people))
 
     graph = nx.Graph(name='Movie/Actor relationships')
-    for person in movie_data.people:
-        graph.add_node(person)
+    # for person in people:
+    #     graph.add_node(person)
 
     movie_count = 0
     for movie in movie_data.movies:
         relation_found = False
+        if display_decades:
+            graph.add_edge(movie, str(movie.year)[:3] + '0')
         for actor in movie.actors:
-            if actor in movie_data.people:
+            if actor in people:
                 if not relation_found:
-                    # Only add a movie if we'll have an actor associated
+                    # Only count a movie if we'll have an actor associated
                     movie_count += 1
-                    graph.add_node(movie)
+                    # graph.add_node(movie)
                     relation_found = True
                 graph.add_edge(movie, actor)
     logging.info('Now there are only %d movies', movie_count)

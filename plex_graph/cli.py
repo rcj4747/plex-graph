@@ -47,9 +47,23 @@ def harvest() -> None:
 @click.command()
 @click.option('-r', '--relationships', default=11, show_default=True,
               help='Required minimum movies to display an actor')
-def graph(relationships: int) -> None:
+@click.option('--actors/--no-actors', default=True,
+              help='Display graph nodes for actors')
+@click.option('--decades/--no-decades', default=False,
+              help='Display graph nodes for decades')
+@click.option('--contentratings/--no-contentratings', default=False,
+              help='Display graph nodes for content ratings (G, PG, ...)')
+def graph(relationships: int,
+          actors: bool,
+          decades: bool,
+          contentratings: bool,
+          ) -> None:
     '''Display a graph of movie / actor relationships'''
-    data.graph(relationships)
+    data.graph(relationships,
+               display_actors=actors,
+               display_decades=decades,
+               display_contentratings=contentratings,
+               )
 
 
 @click.command()
